@@ -1,0 +1,48 @@
+name: terraform
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+       
+    # https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform
+    steps:
+    - uses: actions/checkout@v2
+    - id: auth
+      name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v0
+      with:
+        workload_identity_provider: # projects/{{ project numeric ID }}/locations/global/workloadIdentityPools/{{ workload identity pool name }}/providers/{{ provider-name }}
+        service_account: # {{ terraform service account name }}@{{ project name }}.iam.gserviceaccount.com
+        create_credentials_file: true
+    
+    - uses: hashicorp/setup-terraform@v1
+    - id: init
+      name: Terraform init
+      run: |
+        terraform init
+
+    # For the plan and apply to be consistent, ideally the plan output should be stored and then reused in the apply step
+    - id: plan
+      name: Terraform plan
+      run: |
+        terraform plan -no-color
+        
+    - id: apply
+      name: Terraform apply
+      if: ${{ github.ref == 'refs/heads/master' }}
+      run: |
+        terraform apply -auto-approve
+  
